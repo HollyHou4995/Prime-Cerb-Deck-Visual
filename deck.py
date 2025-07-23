@@ -217,7 +217,6 @@ if new_file:
 
 # --- CA Hotel Map Section ---
 st.markdown("Step 3: California Hotel Revenue Map")
-
 if new_df is not None:
     try:
         fig_map = plot_ca_hotel_revenue_map(new_df)
