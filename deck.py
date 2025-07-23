@@ -3,6 +3,8 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
+import plotly.express as px
+
 
 # ----------------------------------------
 # Data Loader
@@ -111,6 +113,80 @@ def plot_monthly_heatmap(monthly_df, new_month_df, month_name, title):
     plt.tight_layout()
     return heatmap_df, fig
 
+
+# ----------------------------------------
+# CA hotel Map plot
+# ----------------------------------------
+
+import plotly.express as px
+import pandas as pd
+
+def plot_ca_hotel_revenue_map(processed_df: pd.DataFrame):
+    # Built-in California hotel data
+    cali_hotel = pd.DataFrame({
+        "Hotel Name": [
+            "HH Belmont, CA",
+            "RI Fremont, CA",
+            "RI Ontario Airport, CA",
+            "RI San Jose Campbell, CA",
+            "RI San Jose South, CA"
+        ],
+        "state": ["CA"] * 5,
+        "Latitude": [
+            37.53236502,
+            37.53200328,
+            34.06800505,
+            37.27190488,
+            37.2339757
+        ],
+        "Longitude": [
+            -122.2709619,
+            -122.0031049,
+            -117.6071566,
+            -121.9371415,
+            -121.7736624
+        ]
+    })
+
+    # Step 1: Filter CA rows
+    df_CA = processed_df[processed_df["state"] == "CA"].copy()
+
+    # Step 2: Normalize hotel names to match cali_hotel
+    name_map = {
+        "HHBelmontCA-309601": "HH Belmont, CA",
+        "RIFremontCA-309607": "RI Fremont, CA",
+        "RIOntarioAirportCA-309636": "RI Ontario Airport, CA",
+        "RISanJoseCampbellCA-309602": "RI San Jose Campbell, CA",
+        "RISanJoseSouthCA-309606": "RI San Jose South, CA"
+    }
+    df_CA["hotel name"] = df_CA["hotel name"].replace(name_map)
+
+    # Step 3: Merge with coordinates
+    df_CA = df_CA.merge(cali_hotel, how="left", left_on="hotel name", right_on="Hotel Name")
+
+    # Step 4: Plot
+    fig = px.scatter_mapbox(
+        df_CA,
+        lat="Latitude",
+        lon="Longitude",
+        color="revenue variance",
+        color_continuous_scale="RdYlGn",
+        zoom=5.5,
+        size_max=50,
+        hover_name="hotel name",
+        hover_data={
+            "revenue variance": True,
+            "Latitude": False,
+            "Longitude": False
+        },
+        title="California Hotels: YoY Revenue Variance (Map View)"
+    )
+
+    fig.update_layout(mapbox_style="carto-positron")
+    fig.update_layout(margin={"r": 0, "t": 40, "l": 0, "b": 0})
+    return fig
+
+
 # ----------------------------------------
 # Streamlit App
 # ----------------------------------------
@@ -139,10 +215,20 @@ if new_file:
     except Exception as e:
         st.error(f"❌ Failed to process new file: {e}")
 
+# --- CA Hotel Map Section ---
+st.markdown("Step 3: California Hotel Revenue Map")
+
+if new_df is not None:
+    try:
+        fig_map = plot_ca_hotel_revenue_map(new_df)
+        st.plotly_chart(fig_map, use_container_width=True)
+    except Exception as e:
+        st.error(f"❌ Failed to generate map: {e}")
+
 # Step 2: Upload Existing Monthly File
 existing_df = None
 if new_df is not None:
-    existing_file = st.file_uploader("Step 3: Upload Existing Monthly File (CSV only)", type=["csv"], key="existing")
+    existing_file = st.file_uploader("Step 4: Upload Existing Monthly File (CSV only)", type=["csv"], key="existing")
     if existing_file:
         try:
             existing_df = pd.read_csv(existing_file)
@@ -150,6 +236,8 @@ if new_df is not None:
             st.dataframe(existing_df.head())
         except Exception as e:
             st.error(f"❌ Failed to load existing file: {e}")
+
+
 
 # Step 3: Generate Heatmap
 if new_df is not None and existing_df is not None:
